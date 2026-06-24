@@ -110,7 +110,7 @@
 //! end
 //! ```
 //!
-//! *Identation is not enforced.*
+//! *Indentation is not enforced.*
 //!
 //! # Usage
 //!
