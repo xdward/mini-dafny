@@ -85,8 +85,3 @@ file for your specification under the root directory and verify it with the comm
 ```
 cargo run -- spec.txt
 ```
-
-> [!IMPORTANT]
-> A dynamic system library can also be built with the `cargo build --lib` command for
-> external use. The library was developed with the intention of integrating it into a
-> WebAssembly sandbox. This compatability hasn't been fully implemented yet.
