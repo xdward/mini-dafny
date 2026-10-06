@@ -22,7 +22,11 @@ jobs:
                   version: 5.0.1
                   emsdk-version: 5.0.5
                   actions-cache-folder: "emsdk-cache"
-            - run: rustup target add wasm32-unknown-emscripten
+            - name: Install build target and wasm-bindgen-cli
+              # wasm-bindgen-cli must be installed with the version pinned in Cargo.toml
+              run: |
+                  rustup target add wasm32-unknown-emscripten
+                  cargo install wasm-bindgen-cli --version 0.2.129
             - run: cargo build-sandbox-wasm --verbose
             - name: Check build artifacts
               run: |
