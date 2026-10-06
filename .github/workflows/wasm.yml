@@ -1,38 +1,50 @@
-name: Emscripten WASM
+name: WASM Sandbox
 
 on:
+    workflow_run:
+        workflows: ["CI"]
+        types: [completed]
     push:
         branches: ["main"]
-        paths-ignore:
-            - ".gitignore"
-            - "README.md"
-            - ".github/workflows/ci.yml"
-            - ".github/workflows/docs.yml"
+        paths:
+            - ".github/workflows/wasm.yml"
     pull_request:
+        paths:
+            - ".github/workflows/wasm.yml"
     workflow_dispatch:
 
 env:
     CARGO_TERM_COLOR: always
+    EMSDK_VERSION: 6.0.10 # req: >=6.0.10
+    WASM_BINDGEN_CLI_VERSION: 0.2.129 # req: >=0.2.129
+    # note: wasm-bindgen-cli must have the same version as the wasm-bindgen crate in Cargo.toml
 
 jobs:
     build:
+        if: >
+            github.event_name != 'workflow_run' ||
+            github.event.workflow_run.conclusion == 'success'
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/cache@v4
+            - uses: actions/checkout@v7
+              with:
+                  ref: ${{ github.event.workflow_run.head_sha }}
+            - uses: actions/cache@v6
               with:
                   path: |
                       ~/.cargo/registry
                       ~/.cargo/git
+                      ~/.cargo/bin
+                      ~/.cargo/.crates.toml
+                      ~/.cargo/.crates2.json
                       target
-                  key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+                  key: ${{ runner.os }}-wasm-cargo-v1-${{ env.EMSDK_VERSION }}-${{ env.WASM_BINDGEN_CLI_VERSION }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', '.cargo/config.toml') }}
             - uses: emscripten-core/setup-emsdk@v15
               with:
-                  version: 6.0.10 # req: >=6.0.10
+                  version: ${{ env.EMSDK_VERSION }}
                   actions-cache-folder: "emsdk-cache"
             - run: rustup target add wasm32-unknown-emscripten
-            # wasm-bindgen-cli must be installed with the version pinned in Cargo.toml
-            - run: cargo install wasm-bindgen-cli --version 0.2.129
+            - run: cargo install wasm-bindgen-cli --version $WASM_BINDGEN_CLI_VERSION
             - env:
                   CFLAGS: -fwasm-exceptions
                   CXXFLAGS: -fwasm-exceptions
