@@ -1,0 +1,24 @@
+[target.wasm32-unknown-emscripten]
+linker = "em++"
+rustflags = [
+  "-Cpanic=abort",
+  "-Crelocation-model=static",
+  "-Clink-arg=-fexceptions",
+  "-Clink-arg=-sWASM_BINDGEN",
+  "-Clink-arg=-Wno-experimental",
+  "-Clink-arg=-sMODULARIZE",
+  "-Clink-arg=-sEXPORT_ES6",
+]
+
+[env]
+CFLAGS = "-fwasm-exceptions"
+CXXFLAGS = "-fwasm-exceptions"
+
+[alias]
+build-sandbox-wasm = [
+  "build",
+  "--bin", "sandbox-wasm",
+  "--target", "wasm32-unknown-emscripten",
+  "--release",
+  "--features", "z3/vendored",
+]

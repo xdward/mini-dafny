@@ -130,7 +130,6 @@
 //! println!("{}", result.message);
 //! ```
 
-use wasm_bindgen::prelude::*;
 use z3::Solver;
 
 pub mod ast;
@@ -141,7 +140,6 @@ pub mod lexer;
 pub mod parser;
 
 /// Result produced by the verifier.
-#[wasm_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerifierResult {
     /// The specification is provably correct.
@@ -153,7 +151,6 @@ pub enum VerifierResult {
 }
 
 /// Contains the verification result and message.
-#[wasm_bindgen(getter_with_clone)]
 pub struct Response {
     /// The verifier's assessment of the specification.
     pub result: VerifierResult,
@@ -162,7 +159,6 @@ pub struct Response {
 }
 
 /// Verifies the correctness of a specification.
-#[wasm_bindgen]
 pub fn verify(input: &str) -> Response {
     let tokens = match lexer::tokenize(input) {
         Ok(result) => result,
@@ -173,6 +169,7 @@ pub fn verify(input: &str) -> Response {
             };
         }
     };
+
     let mut ast = match parser::parse(&tokens) {
         Ok(result) => result,
         Err(err) => {
@@ -182,6 +179,7 @@ pub fn verify(input: &str) -> Response {
             };
         }
     };
+
     let (vc, env) = match compiler::compile(&mut ast) {
         Ok(result) => result,
         Err(err) => {
@@ -204,7 +202,7 @@ pub fn verify(input: &str) -> Response {
         },
         z3::SatResult::Unknown => Response {
             result: VerifierResult::Counterexample,
-            message: "err[Z3]: unexpected error".to_string(),
+            message: "error[Z3]: unexpected error".to_string(),
         },
         z3::SatResult::Sat => {
             let mut msg = String::from("counterexample:\n\n");
