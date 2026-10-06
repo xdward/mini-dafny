@@ -15,7 +15,7 @@ formulized into a problem that can be solved by theorem provers such as
 specification or finds a counterexample that breaks the requirements.
 
 Documentation for the language can be found
-[here](https://xdward.github.io/mini-dafny/verifier/).
+[here](https://xdward.github.io/mini-dafny/docs/verifier/).
 
 ```mermaid
 stateDiagram

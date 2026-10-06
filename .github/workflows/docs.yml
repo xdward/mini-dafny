@@ -31,8 +31,11 @@ jobs:
                       target
                   key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
             - run: cargo doc --release --no-deps --document-private-items
+            - run: |
+                  mkdir -p pages/docs
+                  cp -r target/doc/. pages/docs/
             - uses: actions/upload-pages-artifact@v4
               with:
-                  path: target/doc
+                  path: pages
             - id: deployment
               uses: actions/deploy-pages@v4
