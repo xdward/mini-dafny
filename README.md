@@ -126,7 +126,7 @@ program. The `build-sandbox-wasm` alias from [`.cargo/config.toml`](.cargo/confi
 > feature builds and links Z3 from source. Due to this, the build duration sits at approximately
 > **15-20 minutes**, depending on the host machine.
 
-Before starting the build, install Emscripten and activate it in your current shell.
+Before starting the build, install Emscripten and activate it in your current shell[^1].
 
 ```sh
 git clone https://github.com/emscripten-core/emsdk.git --depth 1
@@ -137,7 +137,7 @@ source ./emsdk/emsdk_env.sh
 
 Install the `wasm-unknown-emscripten` target and `wasm-bindgen-cli`. When installing the CLI, you
 must flag the **exact** version that is used by the `wasm-bindgen` create in
-[`Cargo.lock`](Cargo.lock). For convenience, [`Cargo.toml`](Cargo.toml) pins the create version for
+[`Cargo.lock`](Cargo.lock)[^2]. For convenience, [`Cargo.toml`](Cargo.toml) pins the create version for
 `wasm-bindgen`.
 
 ```sh
