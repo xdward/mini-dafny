@@ -11,6 +11,8 @@ on:
 
 env:
     CARGO_TERM_COLOR: always
+    CFLAGS: -fwasm-exceptions
+    CXXFLAGS: -fwasm-exceptions
 
 jobs:
     build:

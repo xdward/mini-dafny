@@ -10,10 +10,6 @@ rustflags = [
   "-Clink-arg=-sEXPORT_ES6",
 ]
 
-[env]
-CFLAGS = "-fwasm-exceptions"
-CXXFLAGS = "-fwasm-exceptions"
-
 [alias]
 build-sandbox-wasm = [
   "build",
