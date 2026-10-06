@@ -11,8 +11,6 @@ on:
 
 env:
     CARGO_TERM_COLOR: always
-    CFLAGS: -fwasm-exceptions
-    CXXFLAGS: -fwasm-exceptions
 
 jobs:
     build:
@@ -23,12 +21,13 @@ jobs:
               with:
                   version: 6.0.10 # req: >=6.0.10
                   actions-cache-folder: "emsdk-cache"
+            - run: rustup target add wasm32-unknown-emscripten
             # wasm-bindgen-cli must be installed with the version pinned in Cargo.toml
-            - name: Install build target and wasm-bindgen-cli
-              run: |
-                  rustup target add wasm32-unknown-emscripten
-                  cargo install wasm-bindgen-cli --version 0.2.129
-            - run: cargo build-sandbox-wasm --verbose
+            - run: cargo install wasm-bindgen-cli --version 0.2.129
+            - env:
+                  CFLAGS: -fwasm-exceptions
+                  CXXFLAGS: -fwasm-exceptions
+              run: cargo build-sandbox-wasm --verbose
             - name: Check build artifacts
               run: |
                   test -s target/wasm32-unknown-emscripten/release/deps/sandbox_wasm.js
