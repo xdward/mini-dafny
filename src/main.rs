@@ -5,7 +5,7 @@ use std::process;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
-        eprintln!("usage: {} <file.txt>", &args[0]);
+        eprintln!("usage: {} <file.txt>", args[0]);
         process::exit(1);
     }
 

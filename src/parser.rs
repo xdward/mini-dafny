@@ -24,7 +24,7 @@ enum BlockTerminal {
     /// End of the current scope.
     End,
     /// End of the token stream.
-    EOF,
+    Eof,
 }
 
 /// Parses a variable declaration from a slice of tokens.
@@ -138,8 +138,8 @@ fn parse_if(ctx: &mut ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError
 
     Ok(Stmt::If {
         condition: cond,
-        then_branch: then_branch,
-        else_branch: else_branch,
+        then_branch,
+        else_branch,
     })
 }
 
@@ -163,10 +163,13 @@ fn parse_if(ctx: &mut ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError
 /// slices, which contain the invariant, loop body, and `else`/`end` keywords.
 fn parse_while(ctx: &mut ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError> {
     let cond = parse_expr(tokens, ctx.line)?;
-    let inv = match {
+
+    let next = {
         ctx.line += 1;
         ctx.iter.next()
-    } {
+    };
+
+    let inv = match next {
         Some([Token::Invariant, inv_tokens @ ..]) => parse_expr(inv_tokens, ctx.line)?,
         _ => return Err(ParseError::ExpectedInvariant(ctx.line)),
     };
@@ -179,7 +182,7 @@ fn parse_while(ctx: &mut ParseContext, tokens: &[Token]) -> Result<Stmt, ParseEr
     Ok(Stmt::While {
         condition: cond,
         invariant: inv,
-        body: body,
+        body,
     })
 }
 
@@ -216,7 +219,7 @@ fn parse_block(ctx: &mut ParseContext) -> Result<(Block, BlockTerminal), ParseEr
         }
     }
 
-    Ok((Block(block), BlockTerminal::EOF))
+    Ok((Block(block), BlockTerminal::Eof))
 }
 
 /// Parses an abstract syntax tree (AST) from a token stream.
@@ -229,7 +232,7 @@ pub fn parse(tokens: &[Token]) -> Result<Block, ParseError> {
     };
 
     match parse_block(&mut ctx)? {
-        (ast, BlockTerminal::EOF) => Ok(ast),
+        (ast, BlockTerminal::Eof) => Ok(ast),
         _ => Err(ParseError::ExpectedEof(ctx.line)),
     }
 }

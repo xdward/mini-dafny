@@ -186,7 +186,7 @@ pub fn compile(ast: &mut Block) -> Result<(Z3Bool, Env), CompileError> {
     let pre = Z3Bool::from_bool(true);
     let post = Z3Bool::from_bool(true);
 
-    Ok((pre.implies(ast.wp(&mut env, &post)?), env))
+    Ok((pre.implies(ast.wp(&env, &post)?), env))
 }
 
 #[cfg(test)]
@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn test_int_encoding() {
         assert_eq!(
-            Expr::Boolean(true).smt_encode(&mut HashMap::new()).unwrap(),
+            Expr::Boolean(true).smt_encode(&HashMap::new()).unwrap(),
             Encoding::Bool(Z3Bool::from_bool(true))
         );
     }
@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn test_bool_encoding() {
         assert_eq!(
-            Expr::Integer(2).smt_encode(&mut HashMap::new()).unwrap(),
+            Expr::Integer(2).smt_encode(&HashMap::new()).unwrap(),
             Encoding::Int(Z3Int::from_i64(2))
         );
     }
@@ -215,9 +215,7 @@ mod tests {
         env.insert("x".to_string(), Z3Int::fresh_const("x"));
 
         assert_eq!(
-            Expr::Variable("x".to_string())
-                .smt_encode(&mut env)
-                .unwrap(),
+            Expr::Variable("x".to_string()).smt_encode(&env).unwrap(),
             Encoding::Int(env.get("x").unwrap().to_owned())
         );
     }
@@ -243,7 +241,7 @@ mod tests {
                     rhs: Box::new(Expr::Integer(2))
                 })
             }
-            .smt_encode(&mut HashMap::new())
+            .smt_encode(&HashMap::new())
             .unwrap()
             .eval_int()
             .unwrap(),
@@ -268,7 +266,7 @@ mod tests {
                 op: Symbol::Or,
                 rhs: Box::new(Expr::Boolean(true))
             }
-            .smt_encode(&mut HashMap::new())
+            .smt_encode(&HashMap::new())
             .unwrap()
             .eval_bool()
             .unwrap(),
@@ -290,7 +288,7 @@ mod tests {
                 op: Symbol::Add,
                 rhs: Box::new(Expr::Integer(1))
             }
-            .smt_encode(&mut env)
+            .smt_encode(&env)
             .unwrap()
             .eval_int()
             .unwrap(),

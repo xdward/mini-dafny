@@ -2,7 +2,7 @@
 
 use crate::errors::LexError;
 use regex::Regex;
-use std::sync::LazyLock;
+use std::{str::FromStr, sync::LazyLock};
 
 /// Regular expression for whitespace patterns.
 static RE_WHITESPACE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?:\n|[ \t]+)").unwrap());
@@ -56,9 +56,11 @@ pub enum Symbol {
     RParen,
 }
 
-impl Symbol {
+impl FromStr for Symbol {
+    type Err = LexError;
+
     /// Parses a symbol from its string representation.
-    pub fn from_str(s: &str) -> Result<Self, LexError> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "+" => Ok(Self::Add),
             "-" => Ok(Self::Sub),
@@ -120,7 +122,7 @@ pub enum Token {
 /// match found. A vector of tokens is returned if the source is a valid program. Otherwise,
 /// [LexError] is returned for invalid matches or unrecognizable sequences.
 pub fn tokenize(source: &str) -> Result<Vec<Token>, LexError> {
-    if source.len() == 0 {
+    if source.is_empty() {
         return Err(LexError::MissingInput);
     }
 

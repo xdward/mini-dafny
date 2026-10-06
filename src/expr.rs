@@ -71,7 +71,7 @@ fn pratt_parser(ctx: &mut PrattParseContext, prev_prec: i64) -> Result<Expr, Par
             break;
         }
 
-        if !(precedence(*tok, ctx.line)? > prev_prec) {
+        if !(precedence(tok, ctx.line)? > prev_prec) {
             break;
         }
 
@@ -103,7 +103,7 @@ pub fn parse_expr(tokens: &[Token], line: u32) -> Result<Expr, ParseError> {
 
     let mut ctx = PrattParseContext {
         iter: tokens.iter().peekable(),
-        line: line,
+        line,
     };
 
     let expr = pratt_parser(&mut ctx, 0);
@@ -112,7 +112,7 @@ pub fn parse_expr(tokens: &[Token], line: u32) -> Result<Expr, ParseError> {
         return Err(ParseError::TrailingParenthesis(line));
     }
 
-    return expr;
+    expr
 }
 
 #[cfg(test)]
