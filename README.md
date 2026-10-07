@@ -75,10 +75,22 @@ means that the specification fails for the minimum required value for `inp`. Thi
 is incremented at the end. Removing the `out := out + 1` statement would make this
 specification correct.
 
-The example above can be found in [examples/copy.rs](examples/copy.rs). To run it locally, use:
+The example above can be found in [`examples/copy.rs`](examples/copy.rs). To run it locally, use:
 `cargo run --example copy`.
 
 ## Usage
+
+> [!TIP]
+> This project depends on the [z3-sys](https://docs.rs/crate/z3-sys) crate, so a local installation
+> of Z3 (version 4.8.17 or later) is required. If you don't wish to install Z3, you can use a
+> pre-compiled release from the Z3 repository. Add the `--features z3/gh-release` flag when running
+> any `cargo` command.
+
+Build the project:
+
+```sh
+cargo build
+```
 
 Create a `.txt` file for your specification under the root directory and verify it with the
 command below:
@@ -94,7 +106,7 @@ the command-line and `sandbox-wasm` binary for running a browser sandbox.
 
 ### `verifier` binary
 
-The default binary is defined in [src/main.rs](src/main.rs) and will use the default build target
+The default binary is defined in [`src/main.rs`](src/main.rs) and will use the default build target
 (the host architecture). Build it with either a debug or release build:
 
 ```sh
@@ -116,12 +128,12 @@ cargo test
 
 ### `sandbox-wasm` binary
 
-The [src/bin/sandbox-wasm.rs](src/bin/sandbox-wasm.rs) binary exposes the `Sandbox` object to
+The [`src/bin/sandbox-wasm.rs`](`src/bin/sandbox-wasm.rs`) binary exposes the `Sandbox` object to
 JavaScript through `wasm-bindgen`; it is built for the browser rather than run as a command-line
-program. The `build-sandbox-wasm` alias from [`.cargo/config.toml`](.cargo/config.toml) builds the
-`sandbox-wasm` binary with the `wasm32-unknown-emscripten` target and `--release` profile.
+program. The `build-sandbox-wasm` alias from [`.cargo/config.toml`](`.cargo/config.toml`) builds the
+`sandbox-wasm` binary with the `wasm32-unknown-emscripten` target and release profile.
 
-> [!IMPORTANT]
+> [!WARNING]
 > The `vendored` feature is enabled for the [z3-sys](https://github.com/prove-rs/z3.rs) create. This
 > feature builds and links Z3 from source. Due to this, the build duration sits at approximately
 > **15-20 minutes**, depending on the host machine.
