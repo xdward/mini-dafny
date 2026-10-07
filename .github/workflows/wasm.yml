@@ -4,13 +4,6 @@ on:
     workflow_run:
         workflows: ["CI"]
         types: [completed]
-    push:
-        branches: ["main"]
-        paths:
-            - ".github/workflows/wasm.yml"
-    pull_request:
-        paths:
-            - ".github/workflows/wasm.yml"
     workflow_dispatch:
 
 env:

@@ -9,6 +9,7 @@ on:
             - "!.gitignore"
             - "!.github/workflows/**"
             - ".github/workflows/ci.yml"
+            - ".github/workflows/wasm.yml"
     pull_request:
 
 env:
