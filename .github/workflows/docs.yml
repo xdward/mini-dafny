@@ -10,7 +10,6 @@ on:
             - "!.github/workflows/**"
             - ".github/workflows/docs.yml"
     pull_request:
-    workflow_dispatch:
 
 permissions:
     contents: read
