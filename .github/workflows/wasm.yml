@@ -39,6 +39,10 @@ jobs:
                       ~/.cargo/.crates2.json
                       target
                   key: ${{ runner.os }}-wasm-cargo-v1-${{ env.EMSDK_VERSION }}-${{ env.WASM_BINDGEN_CLI_VERSION }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', '.cargo/config.toml') }}
+            - uses: cda-tum/setup-z3@v1.7.3
+              with:
+                  version: 4.8.17 # must meet minimum requirement of z3 crate
+                  add_to_library_path: true
             - uses: emscripten-core/setup-emsdk@v15
               with:
                   version: ${{ env.EMSDK_VERSION }}
