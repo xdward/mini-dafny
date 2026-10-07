@@ -47,7 +47,7 @@ jobs:
                   test -s target/wasm32-unknown-emscripten/release/deps/sandbox_wasm.js
                   test -s target/wasm32-unknown-emscripten/release/deps/sandbox_wasm.wasm
                   test -s target/wasm32-unknown-emscripten/release/sandbox_wasm.wasm
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               with:
                   name: sandbox-wasm
                   if-no-files-found: error
