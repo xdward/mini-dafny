@@ -48,8 +48,6 @@ jobs:
                       ~/.cargo/git
                       target
                   key: ${{ runner.os }}-cargo-v1-${{ hashFiles('**/Cargo.lock') }}
-            - uses: cda-tum/setup-z3@v1.7.3
-              with:
-                  version: 4.8.17 # must meet minimum requirement of z3 crate
-                  add_to_library_path: true
-            - run: cargo test --all-targets --no-fail-fast --locked
+            - env:
+                  Z3_SYS_Z3_VERSION: 4.8.17
+              run: cargo test --all-targets --no-fail-fast --locked --features z3/gh-release
