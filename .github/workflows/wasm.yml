@@ -1,4 +1,4 @@
-name: Build WASM Sandbox
+name: WASM Sandbox
 
 on:
     workflow_run:
