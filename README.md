@@ -107,22 +107,17 @@ the command-line and `sandbox-wasm` binary for running a browser sandbox.
 ### `verifier` binary
 
 The default binary is defined in [`src/main.rs`](src/main.rs) and will use the default build target
-(the host architecture). Build it with either a debug or release build:
+(the host architecture). Run the default binary with a specification file as its only argument:
 
 ```sh
 cargo build
-cargo build --release
-```
-
-Run the default binary with a specification file as its only argument:
-
-```sh
 cargo run -- spec.txt
 ```
 
 Run the test suite with:
 
 ```sh
+cargo clippy
 cargo test
 ```
 

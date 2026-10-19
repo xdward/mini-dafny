@@ -4,33 +4,33 @@ use crate::lexer::Symbol;
 
 /// Represents an expression.
 #[derive(Debug, PartialEq, Eq)]
-pub enum Expr {
-    Boolean(bool),
+pub enum Expr<'src> {
     Integer(i64),
-    Variable(String),
+    Boolean(bool),
+    Variable(&'src str),
     BinOp {
-        lhs: Box<Expr>,
+        lhs: Box<Expr<'src>>,
         op: Symbol,
-        rhs: Box<Expr>,
+        rhs: Box<Expr<'src>>,
     },
 }
 
 /// Represents a statement.
 #[derive(Debug, PartialEq, Eq)]
-pub enum Stmt {
-    Declare(Vec<String>),
-    Assign(String, Expr),
-    Assume(Expr),
-    Assert(Expr),
+pub enum Stmt<'src> {
+    Declare(Vec<&'src str>),
+    Assign(&'src str, Expr<'src>),
+    Assume(Expr<'src>),
+    Assert(Expr<'src>),
     If {
-        condition: Expr,
-        then_branch: Block,
-        else_branch: Option<Block>,
+        condition: Expr<'src>,
+        then_branch: Block<'src>,
+        else_branch: Option<Block<'src>>,
     },
     While {
-        condition: Expr,
-        invariant: Expr,
-        body: Block,
+        condition: Expr<'src>,
+        invariant: Expr<'src>,
+        body: Block<'src>,
     },
 
     // helper variants for parsing control flow
@@ -41,4 +41,4 @@ pub enum Stmt {
 
 /// Represents a sequence of statements.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Block(pub Vec<Stmt>);
+pub struct Block<'src>(pub Vec<Stmt<'src>>);

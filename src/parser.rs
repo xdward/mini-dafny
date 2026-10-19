@@ -10,11 +10,11 @@ use crate::{
 };
 
 /// Used to share the parser's current state across functions.
-struct ParseContext<'a> {
+struct ParseContext<'tokens, 'src> {
     /// A peekable iterator over slices of tokens.
-    iter: Peekable<Iter<'a, &'a [Token]>>,
+    iter: Peekable<Iter<'tokens, &'tokens [Token<'src>]>>,
     /// The index (1-based) of the current line being parsed.
-    line: u32,
+    line: usize,
 }
 
 /// Control flow indicators.
@@ -36,13 +36,16 @@ enum BlockTerminal {
 /// - *Multi-Variable Declaration:* `var x, y, x`
 ///
 /// The `tokens` argument is the slice of tokens following the `var` keyword.
-fn parse_delcare(ctx: &ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError> {
+fn parse_delcare<'src>(
+    ctx: &ParseContext<'_, 'src>,
+    tokens: &[Token<'src>],
+) -> Result<Stmt<'src>, ParseError> {
     let mut iter = tokens.iter();
     let mut vars = Vec::new();
 
     // extract first variable
     match iter.next() {
-        Some(Token::Identifier(x)) => vars.push(x.clone()),
+        Some(Token::Identifier(x)) => vars.push(*x),
         _ => return Err(ParseError::InvalidDeclare(ctx.line)),
     }
 
@@ -50,7 +53,7 @@ fn parse_delcare(ctx: &ParseContext, tokens: &[Token]) -> Result<Stmt, ParseErro
     while let Some(tok) = iter.next() {
         match tok {
             Token::Comma => match iter.next() {
-                Some(Token::Identifier(x)) => vars.push(x.clone()),
+                Some(Token::Identifier(x)) => vars.push(*x),
                 None => return Err(ParseError::TrailingComma(ctx.line)),
                 _ => return Err(ParseError::InvalidDeclare(ctx.line)),
             },
@@ -70,7 +73,10 @@ fn parse_delcare(ctx: &ParseContext, tokens: &[Token]) -> Result<Stmt, ParseErro
 /// ```
 ///
 /// The `tokens` argument is the slice of tokens following the `assume` keyword.
-fn parse_assume(ctx: &ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError> {
+fn parse_assume<'src>(
+    ctx: &ParseContext<'_, 'src>,
+    tokens: &[Token<'src>],
+) -> Result<Stmt<'src>, ParseError> {
     Ok(Stmt::Assume(parse_expr(tokens, ctx.line)?))
 }
 
@@ -83,7 +89,10 @@ fn parse_assume(ctx: &ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError
 /// ```
 ///
 /// The `tokens` argument is the slice of tokens following the `assert` keyword.
-fn parse_assert(ctx: &ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError> {
+fn parse_assert<'src>(
+    ctx: &ParseContext<'_, 'src>,
+    tokens: &[Token<'src>],
+) -> Result<Stmt<'src>, ParseError> {
     Ok(Stmt::Assert(parse_expr(tokens, ctx.line)?))
 }
 
@@ -98,9 +107,13 @@ fn parse_assert(ctx: &ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError
 ///
 /// The `head` argument is a reference to the variable identifier token and the `tokens` argument
 /// is the slice of tokens after the assignment symbol.
-fn parse_assign(ctx: &ParseContext, head: &Token, tokens: &[Token]) -> Result<Stmt, ParseError> {
+fn parse_assign<'src>(
+    ctx: &ParseContext<'_, 'src>,
+    head: &Token<'src>,
+    tokens: &[Token<'src>],
+) -> Result<Stmt<'src>, ParseError> {
     match head {
-        Token::Identifier(x) => Ok(Stmt::Assign(x.clone(), parse_expr(tokens, ctx.line)?)),
+        Token::Identifier(x) => Ok(Stmt::Assign(x, parse_expr(tokens, ctx.line)?)),
         _ => Err(ParseError::InvalidAssign(ctx.line)),
     }
 }
@@ -123,7 +136,10 @@ fn parse_assign(ctx: &ParseContext, head: &Token, tokens: &[Token]) -> Result<St
 ///
 /// The `ctx` argument is the parsing context. The context's iterator is used to read succeeding
 /// token slices, which contain statements for both branches and the `else`/`end` keywords.
-fn parse_if(ctx: &mut ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError> {
+fn parse_if<'src>(
+    ctx: &mut ParseContext<'_, 'src>,
+    tokens: &[Token<'src>],
+) -> Result<Stmt<'src>, ParseError> {
     let cond = parse_expr(tokens, ctx.line)?;
     let (then_branch, terminal) = parse_block(ctx)?;
 
@@ -161,7 +177,10 @@ fn parse_if(ctx: &mut ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError
 ///
 /// The `ctx` argument is the parsing context. The context's iterator is used to read succeding
 /// slices, which contain the invariant, loop body, and `else`/`end` keywords.
-fn parse_while(ctx: &mut ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError> {
+fn parse_while<'src>(
+    ctx: &mut ParseContext<'_, 'src>,
+    tokens: &[Token<'src>],
+) -> Result<Stmt<'src>, ParseError> {
     let cond = parse_expr(tokens, ctx.line)?;
 
     let next = {
@@ -187,12 +206,15 @@ fn parse_while(ctx: &mut ParseContext, tokens: &[Token]) -> Result<Stmt, ParseEr
 }
 
 /// Parses a statement from a slice of tokens.
-fn parse_statement(ctx: &mut ParseContext, tokens: &[Token]) -> Result<Stmt, ParseError> {
+fn parse_statement<'src>(
+    ctx: &mut ParseContext<'_, 'src>,
+    tokens: &[Token<'src>],
+) -> Result<Stmt<'src>, ParseError> {
     match tokens {
         [Token::Declare, var_toks @ ..] => parse_delcare(ctx, var_toks),
         [Token::Assume, expr_toks @ ..] => parse_assume(ctx, expr_toks),
         [Token::Assert, expr_toks @ ..] => parse_assert(ctx, expr_toks),
-        [x, Token::Op(Symbol::Assign), expr_toks @ ..] => parse_assign(ctx, x, expr_toks),
+        [x, Token::Operator(Symbol::Assign), expr_toks @ ..] => parse_assign(ctx, x, expr_toks),
         [Token::If, expr_toks @ .., Token::Then] => parse_if(ctx, expr_toks),
         [Token::While, expr_toks @ ..] => parse_while(ctx, expr_toks),
         [Token::Else] => Ok(Stmt::Else),
@@ -204,7 +226,9 @@ fn parse_statement(ctx: &mut ParseContext, tokens: &[Token]) -> Result<Stmt, Par
 }
 
 /// Parses a sequence of statements.
-fn parse_block(ctx: &mut ParseContext) -> Result<(Block, BlockTerminal), ParseError> {
+fn parse_block<'src>(
+    ctx: &mut ParseContext<'_, 'src>,
+) -> Result<(Block<'src>, BlockTerminal), ParseError> {
     let mut block = Vec::new();
 
     while let Some(tokens) = {
@@ -223,8 +247,8 @@ fn parse_block(ctx: &mut ParseContext) -> Result<(Block, BlockTerminal), ParseEr
 }
 
 /// Parses an abstract syntax tree (AST) from a token stream.
-pub fn parse(tokens: &[Token]) -> Result<Block, ParseError> {
-    let lines: Vec<&[Token]> = tokens.split(|tok| matches!(tok, Token::Newline)).collect();
+pub fn parse<'src>(tokens: &[Token<'src>]) -> Result<Block<'src>, ParseError> {
+    let lines: Vec<&[Token<'src>]> = tokens.split(|tok| matches!(tok, Token::Newline)).collect();
 
     let mut ctx = ParseContext {
         iter: lines.iter().peekable(),
@@ -245,8 +269,8 @@ mod tests {
     #[test]
     fn test_declare_var() {
         assert_eq!(
-            parse(&[Token::Declare, Token::Identifier("x".to_string())]).unwrap(),
-            Block(vec![Stmt::Declare(vec!["x".to_string()])])
+            parse(&[Token::Declare, Token::Identifier("x")]).unwrap(),
+            Block(vec![Stmt::Declare(vec!["x"])])
         );
     }
 
@@ -255,12 +279,12 @@ mod tests {
         assert_eq!(
             parse(&[
                 Token::Declare,
-                Token::Identifier("x".to_string()),
+                Token::Identifier("x"),
                 Token::Comma,
-                Token::Identifier("y".to_string())
+                Token::Identifier("y")
             ])
             .unwrap(),
-            Block(vec![Stmt::Declare(vec!["x".to_string(), "y".to_string()])])
+            Block(vec![Stmt::Declare(vec!["x", "y"])])
         );
     }
 
@@ -269,8 +293,8 @@ mod tests {
         assert_eq!(
             parse(&[
                 Token::Declare,
-                Token::Identifier("x".to_string()),
-                Token::Identifier("y".to_string())
+                Token::Identifier("x"),
+                Token::Identifier("y")
             ])
             .unwrap_err(),
             ParseError::MissingComma(1)
@@ -282,9 +306,9 @@ mod tests {
         assert_eq!(
             parse(&[
                 Token::Declare,
-                Token::Identifier("x".to_string()),
+                Token::Identifier("x"),
                 Token::Comma,
-                Token::Identifier("y".to_string()),
+                Token::Identifier("y"),
                 Token::Comma,
             ])
             .unwrap_err(),
@@ -312,12 +336,12 @@ mod tests {
     fn test_assign() {
         assert_eq!(
             parse(&[
-                Token::Identifier("x".to_string()),
-                Token::Op(Symbol::Assign),
+                Token::Identifier("x"),
+                Token::Operator(Symbol::Assign),
                 Token::Integer(42)
             ])
             .unwrap(),
-            Block(vec![Stmt::Assign("x".to_string(), Expr::Integer(42))])
+            Block(vec![Stmt::Assign("x", Expr::Integer(42))])
         );
     }
 
@@ -326,7 +350,7 @@ mod tests {
         assert_eq!(
             parse(&[
                 Token::Integer(42),
-                Token::Op(Symbol::Assign),
+                Token::Operator(Symbol::Assign),
                 Token::Integer(42)
             ])
             .unwrap_err(),
@@ -342,8 +366,8 @@ mod tests {
                 Token::Boolean(true),
                 Token::Then,
                 Token::Newline,
-                Token::Identifier("x".to_string()),
-                Token::Op(Symbol::Assign),
+                Token::Identifier("x"),
+                Token::Operator(Symbol::Assign),
                 Token::Integer(1),
                 Token::Newline,
                 Token::End,
@@ -351,7 +375,7 @@ mod tests {
             .unwrap(),
             Block(vec![Stmt::If {
                 condition: Expr::Boolean(true),
-                then_branch: Block(vec![Stmt::Assign("x".to_string(), Expr::Integer(1))]),
+                then_branch: Block(vec![Stmt::Assign("x", Expr::Integer(1))]),
                 else_branch: None
             }])
         );
@@ -425,8 +449,8 @@ mod tests {
                 Token::Newline,
                 Token::Else,
                 Token::Newline,
-                Token::Identifier("x".to_string()),
-                Token::Op(Symbol::Assign),
+                Token::Identifier("x"),
+                Token::Operator(Symbol::Assign),
                 Token::Integer(1),
             ])
             .unwrap_err(),
@@ -439,22 +463,22 @@ mod tests {
         assert_eq!(
             parse(&[
                 Token::While,
-                Token::Identifier("x".to_string()),
+                Token::Identifier("x"),
                 Token::Newline,
                 Token::Invariant,
                 Token::Boolean(true),
                 Token::Newline,
-                Token::Identifier("x".to_string()),
-                Token::Op(Symbol::Assign),
+                Token::Identifier("x"),
+                Token::Operator(Symbol::Assign),
                 Token::Boolean(false),
                 Token::Newline,
                 Token::End,
             ])
             .unwrap(),
             Block(vec![Stmt::While {
-                condition: Expr::Variable("x".to_string()),
+                condition: Expr::Variable("x"),
                 invariant: Expr::Boolean(true),
-                body: Block(vec![Stmt::Assign("x".to_string(), Expr::Boolean(false))])
+                body: Block(vec![Stmt::Assign("x", Expr::Boolean(false))])
             }])
         );
     }
@@ -464,10 +488,10 @@ mod tests {
         assert_eq!(
             parse(&[
                 Token::While,
-                Token::Identifier("x".to_string()),
+                Token::Identifier("x"),
                 Token::Newline,
-                Token::Identifier("x".to_string()),
-                Token::Op(Symbol::Assign),
+                Token::Identifier("x"),
+                Token::Operator(Symbol::Assign),
                 Token::Boolean(false),
                 Token::Newline,
                 Token::End,
@@ -482,13 +506,13 @@ mod tests {
         assert_eq!(
             parse(&[
                 Token::While,
-                Token::Identifier("x".to_string()),
+                Token::Identifier("x"),
                 Token::Newline,
                 Token::Invariant,
                 Token::Boolean(true),
                 Token::Newline,
-                Token::Identifier("x".to_string()),
-                Token::Op(Symbol::Assign),
+                Token::Identifier("x"),
+                Token::Operator(Symbol::Assign),
                 Token::Boolean(false),
                 Token::Newline,
                 // empty line
@@ -527,8 +551,8 @@ mod tests {
     #[test]
     fn test_context() {
         let tokens = [
-            Token::Identifier("x".to_string()),
-            Token::Op(Symbol::Assign),
+            Token::Identifier("x"),
+            Token::Operator(Symbol::Assign),
             Token::Integer(1),
             Token::Newline,
             // empty line
@@ -539,7 +563,8 @@ mod tests {
             Token::Boolean(true),
         ];
 
-        let unparsed: Vec<&[Token]> = tokens.split(|tok| matches!(tok, Token::Newline)).collect();
+        let unparsed: Vec<&[Token<'_>]> =
+            tokens.split(|tok| matches!(tok, Token::Newline)).collect();
 
         let mut ctx = ParseContext {
             iter: unparsed.iter().peekable(),

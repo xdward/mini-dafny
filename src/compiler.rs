@@ -17,7 +17,7 @@ type Z3Int = ast::Int;
 ///
 /// Implemented as a [HashMap], where the key is the variable name (i.e. `"x"`) and the value is an
 /// owned [Int](z3::ast::Int) constant from Z3.
-type Env = HashMap<String, Z3Int>;
+type Env<'src> = HashMap<&'src str, Z3Int>;
 
 /// Represents the SMT encoding of boolean/arithmetic expressions.
 #[derive(Debug, PartialEq, Eq)]
@@ -44,7 +44,7 @@ impl Encoding {
     }
 }
 
-impl Expr {
+impl<'src> Expr<'src> {
     /// Encodes an expression into a model that can be evaluated.
     fn smt_encode(&self, env: &Env) -> Result<Encoding, CompileError> {
         match self {
@@ -87,7 +87,7 @@ impl Expr {
     }
 }
 
-impl Stmt {
+impl<'src> Stmt<'src> {
     /// Calculates the weakest precondition of a statement.
     ///
     /// See: <https://en.wikipedia.org/wiki/Predicate_transformer_semantics#Weakest_preconditions>
@@ -152,7 +152,7 @@ impl Stmt {
     }
 }
 
-impl Block {
+impl<'src> Block<'src> {
     /// Calculates the weakest precondition for a sequence of statements.
     fn wp(&self, env: &Env, post: &Z3Bool) -> Result<Z3Bool, CompileError> {
         let mut expr = post.to_owned();
@@ -164,7 +164,7 @@ impl Block {
 }
 
 /// Generates a verification condition from a specification's AST.
-pub fn compile(ast: &mut Block) -> Result<(Z3Bool, Env), CompileError> {
+pub fn compile<'src>(ast: &mut Block<'src>) -> Result<(Z3Bool, Env<'src>), CompileError> {
     let mut env = HashMap::new();
 
     if let Stmt::Declare(ref identifiers) = ast.0[0] {
@@ -172,7 +172,7 @@ pub fn compile(ast: &mut Block) -> Result<(Z3Bool, Env), CompileError> {
             if env.contains_key(x) {
                 return Err(CompileError::AlreadyDeclared);
             }
-            env.insert(x.clone(), Z3Int::fresh_const(x));
+            env.insert(*x, Z3Int::fresh_const(x));
         }
 
         // Removes the only allowed declaration; any additional declarations will cause an error.
@@ -212,10 +212,10 @@ mod tests {
     #[test]
     fn test_variable_encoding() {
         let mut env = HashMap::new();
-        env.insert("x".to_string(), Z3Int::fresh_const("x"));
+        env.insert("x", Z3Int::fresh_const("x"));
 
         assert_eq!(
-            Expr::Variable("x".to_string()).smt_encode(&env).unwrap(),
+            Expr::Variable("x").smt_encode(&env).unwrap(),
             Encoding::Int(env.get("x").unwrap().to_owned())
         );
     }
@@ -280,11 +280,11 @@ mod tests {
     #[test]
     fn test_polynomial_expr() {
         let mut env = HashMap::new();
-        env.insert("x".to_string(), Z3Int::fresh_const("x"));
+        env.insert("x", Z3Int::fresh_const("x"));
 
         assert_eq!(
             Expr::BinOp {
-                lhs: Box::new(Expr::Variable("x".to_string())),
+                lhs: Box::new(Expr::Variable("x")),
                 op: Symbol::Add,
                 rhs: Box::new(Expr::Integer(1))
             }
@@ -324,10 +324,10 @@ mod tests {
     #[test]
     fn test_assign_wp() {
         let mut env = HashMap::new();
-        env.insert("x".to_string(), Z3Int::fresh_const("x"));
+        env.insert("x", Z3Int::fresh_const("x"));
 
         assert_eq!(
-            Stmt::Assign("x".to_string(), Expr::Integer(1))
+            Stmt::Assign("x", Expr::Integer(1))
                 .wp(&env, &env["x"].ne(Z3Int::from_i64(0)))
                 .unwrap(),
             Z3Int::from_i64(1).ne(Z3Int::from_i64(0))
@@ -356,7 +356,7 @@ mod tests {
     #[test]
     fn test_while_wp() {
         let mut env = HashMap::new();
-        env.insert("x".to_string(), Z3Int::fresh_const("x"));
+        env.insert("x", Z3Int::fresh_const("x"));
 
         assert_eq!(
             Stmt::While {
@@ -385,21 +385,21 @@ mod tests {
     #[test]
     fn test_block() {
         let mut env = HashMap::new();
-        env.insert("x".to_string(), Z3Int::fresh_const("x"));
+        env.insert("x", Z3Int::fresh_const("x"));
 
         assert_eq!(
             Block(vec![
-                Stmt::Assign("x".to_string(), Expr::Integer(40)),
+                Stmt::Assign("x", Expr::Integer(40)),
                 Stmt::Assign(
-                    "x".to_string(),
+                    "x",
                     Expr::BinOp {
-                        lhs: Box::new(Expr::Variable("x".to_string())),
+                        lhs: Box::new(Expr::Variable("x")),
                         op: Symbol::Div,
                         rhs: Box::new(Expr::Integer(5)),
                     },
                 ),
                 Stmt::Assert(Expr::BinOp {
-                    lhs: Box::new(Expr::Variable("x".to_string())),
+                    lhs: Box::new(Expr::Variable("x")),
                     op: Symbol::Eq,
                     rhs: Box::new(Expr::Integer(8)),
                 }),
@@ -422,8 +422,8 @@ mod tests {
     fn test_err_invalid_declare() {
         assert_eq!(
             compile(&mut Block(vec![
-                Stmt::Declare(vec!["x".to_string()]),
-                Stmt::Declare(vec!["x".to_string()]),
+                Stmt::Declare(vec!["x"]),
+                Stmt::Declare(vec!["x"]),
             ]))
             .unwrap_err(),
             CompileError::InvalidDeclaration
@@ -433,11 +433,7 @@ mod tests {
     #[test]
     fn test_err_repeated_variable() {
         assert_eq!(
-            compile(&mut Block(vec![Stmt::Declare(vec![
-                "x".to_string(),
-                "x".to_string()
-            ]),]))
-            .unwrap_err(),
+            compile(&mut Block(vec![Stmt::Declare(vec!["x", "x"]),])).unwrap_err(),
             CompileError::AlreadyDeclared
         );
     }
@@ -446,8 +442,8 @@ mod tests {
     fn test_err_unbound_variable() {
         assert_eq!(
             compile(&mut Block(vec![
-                Stmt::Declare(vec!["x".to_string()]),
-                Stmt::Assign("y".to_string(), Expr::Integer(1)),
+                Stmt::Declare(vec!["x"]),
+                Stmt::Assign("y", Expr::Integer(1)),
             ]))
             .unwrap_err(),
             CompileError::UnboundVariable

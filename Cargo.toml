@@ -10,3 +10,6 @@ z3 = "~0.20.0"
 
 [target.'cfg(target_os = "emscripten")'.dependencies]
 wasm-bindgen = "=0.2.129"
+
+[lints.clippy]
+invalid_regex = "deny"

@@ -2,34 +2,34 @@
 
 use std::fmt;
 
+/// Alias for labeling the `usize` line number field.
+type LineNumber = usize;
+
 /// Errors produced by the lexer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexError {
     /// Received an empty input string.
     MissingInput,
     /// Encountered an invalid substring.
-    InvalidToken(String),
+    InvalidToken(LineNumber, String),
     /// Encountered an invalid symbol.
-    InvalidSymbol(String),
+    InvalidSymbol(LineNumber, String),
     /// Failed to parse an integer.
-    InvalidInt(String),
+    InvalidInt(LineNumber, String),
 }
 
 impl fmt::Display for LexError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::MissingInput => write!(f, "input is missing"),
-            Self::InvalidToken(tok) => write!(f, "invalid token\n-> \"{}\"", tok),
-            Self::InvalidSymbol(tok) => write!(f, "invalid symbol\n-> \"{}\"", tok),
-            Self::InvalidInt(tok) => write!(f, "failed to parse integer\n-> \"{}\"", tok),
+            Self::InvalidToken(ln, tok) => write!(f, "invalid token\n-> Line {ln}\n-> \"{tok}\""),
+            Self::InvalidSymbol(ln, tok) => write!(f, "invalid symbol\n-> Line {ln}\n-> \"{tok}\""),
+            Self::InvalidInt(ln, tok) => write!(f, "invalid integer\n-> Line {ln}\n-> \"{tok}\""),
         }
     }
 }
 
 impl std::error::Error for LexError {}
-
-/// Alias for labeling the `u32` line number field in [ParseError].
-type LineNumber = u32;
 
 /// Errors produced by the parser.
 #[derive(Debug, Clone, PartialEq, Eq)]

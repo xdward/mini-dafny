@@ -1,18 +1,7 @@
 //! Lexical analyzer for token generation.
 
 use crate::errors::LexError;
-use regex::Regex;
-use std::{str::FromStr, sync::LazyLock};
-
-/// Regular expression for whitespace patterns.
-static RE_WHITESPACE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?:\n|[ \t]+)").unwrap());
-/// Regular expression for word patterns.
-static RE_WORD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[A-Za-z][0-9A-Za-z_]*").unwrap());
-/// Regular expression for number patterns.
-static RE_NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^-?\d+").unwrap());
-/// Regular expression for symbol patterns.
-static RE_SYMBOL: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(?:,|:=|==|!=|<=|>=|&&|\|\||[+\-*/<>()])").unwrap());
+use regex::regex;
 
 /// Represents expression operators.
 ///
@@ -56,32 +45,6 @@ pub enum Symbol {
     RParen,
 }
 
-impl FromStr for Symbol {
-    type Err = LexError;
-
-    /// Parses a symbol from its string representation.
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "+" => Ok(Self::Add),
-            "-" => Ok(Self::Sub),
-            "*" => Ok(Self::Mul),
-            "/" => Ok(Self::Div),
-            "<" => Ok(Self::Lt),
-            ">" => Ok(Self::Gt),
-            "<=" => Ok(Self::Le),
-            ">=" => Ok(Self::Ge),
-            "==" => Ok(Self::Eq),
-            "!=" => Ok(Self::Neq),
-            "&&" => Ok(Self::And),
-            "||" => Ok(Self::Or),
-            ":=" => Ok(Self::Assign),
-            "(" => Ok(Self::LParen),
-            ")" => Ok(Self::RParen),
-            _ => Err(LexError::InvalidSymbol(s.to_string())),
-        }
-    }
-}
-
 /// A lexical token produced by the tokenizer.
 ///
 /// There are four type of tokens:
@@ -91,9 +54,9 @@ impl FromStr for Symbol {
 /// - *Symbolic* tokens for operators (see [Symbol])
 /// - *Syntactic* tokens (for syntax)
 #[derive(Debug, PartialEq, Eq)]
-pub enum Token {
+pub enum Token<'a> {
     // Literals
-    Identifier(String),
+    Identifier(&'a str),
     Integer(i64),
     Boolean(bool),
 
@@ -109,7 +72,7 @@ pub enum Token {
     End,
 
     // Symbols
-    Op(Symbol),
+    Operator(Symbol),
 
     // Syntax
     Comma,
@@ -121,28 +84,31 @@ pub enum Token {
 /// Regex pattern matching is used to sequentially scan the source and create a [Token] for each
 /// match found. A vector of tokens is returned if the source is a valid program. Otherwise,
 /// [LexError] is returned for invalid matches or unrecognizable sequences.
-pub fn tokenize(source: &str) -> Result<Vec<Token>, LexError> {
+pub fn tokenize<'src>(source: &'src str) -> Result<Vec<Token<'src>>, LexError> {
     if source.is_empty() {
         return Err(LexError::MissingInput);
     }
 
     let mut tokens = Vec::new();
-    let mut index = 0; // index pointer for the untokenized slice
+    let mut index = 0; // position of the untokenized slice
+    let mut line = 1; // current line being tokenized
 
     while index < source.len() {
         let unread = &source[index..];
 
-        if let Some(m) = RE_WHITESPACE.find(unread) {
+        // match whitespace patterns
+        if let Some(m) = regex!(r"^(?:\n|[ \t]+)").find(unread) {
             if m.as_str() == "\n" {
                 tokens.push(Token::Newline);
+                line += 1;
             }
             index += m.end();
             continue;
         }
 
-        if let Some(m) = RE_WORD.find(unread) {
-            let word = m.as_str();
-            let token = match word {
+        // match keyword patterns
+        if let Some(m) = regex!(r"^[A-Za-z][0-9A-Za-z_]*").find(unread) {
+            let token = match m.as_str() {
                 "TRUE" => Token::Boolean(true),
                 "FALSE" => Token::Boolean(false),
                 "var" => Token::Declare,
@@ -154,35 +120,57 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, LexError> {
                 "while" => Token::While,
                 "invariant" => Token::Invariant,
                 "end" => Token::End,
-                _ => Token::Identifier(word.to_string()),
+                _ => Token::Identifier(m.as_str()),
             };
             tokens.push(token);
             index += m.end();
             continue;
         }
 
-        if let Some(m) = RE_NUMBER.find(unread) {
-            let number = m.as_str();
-            let token = number
+        // match number patterns
+        if let Some(m) = regex!(r"^-?\d+").find(unread) {
+            let token = m
+                .as_str()
                 .parse::<i64>()
                 .map(Token::Integer)
-                .map_err(|_| LexError::InvalidInt(number.to_string()))?;
+                .map_err(|_| LexError::InvalidInt(line, m.as_str().to_string()))?;
             tokens.push(token);
             index += m.end();
             continue;
         }
 
-        if let Some(m) = RE_SYMBOL.find(unread) {
+        // match symbol patterns
+        if let Some(m) = regex!(r"^(?:,|:=|==|!=|<=|>=|&&|\|\||[+\-*/<>()])").find(unread) {
             let token = match m.as_str() {
                 "," => Token::Comma,
-                sym => Token::Op(Symbol::from_str(sym)?),
+                "+" => Token::Operator(Symbol::Add),
+                "-" => Token::Operator(Symbol::Sub),
+                "*" => Token::Operator(Symbol::Mul),
+                "/" => Token::Operator(Symbol::Div),
+                "<" => Token::Operator(Symbol::Lt),
+                ">" => Token::Operator(Symbol::Gt),
+                "<=" => Token::Operator(Symbol::Le),
+                ">=" => Token::Operator(Symbol::Ge),
+                "==" => Token::Operator(Symbol::Eq),
+                "!=" => Token::Operator(Symbol::Neq),
+                "&&" => Token::Operator(Symbol::And),
+                "||" => Token::Operator(Symbol::Or),
+                ":=" => Token::Operator(Symbol::Assign),
+                "(" => Token::Operator(Symbol::LParen),
+                ")" => Token::Operator(Symbol::RParen),
+                _ => return Err(LexError::InvalidSymbol(line, m.as_str().to_string())),
             };
             tokens.push(token);
             index += m.end();
             continue;
         }
 
-        return Err(LexError::InvalidToken(unread.to_string()));
+        return Err(LexError::InvalidToken(line, unread.to_string()));
+    }
+
+    // require at least one token other than a newline
+    if tokens.iter().all(|token| matches!(token, Token::Newline)) {
+        return Err(LexError::MissingInput);
     }
 
     Ok(tokens)
@@ -195,29 +183,29 @@ mod tests {
     #[test]
     fn test_whitespace() {
         assert_eq!(
-            tokenize("\n \t \n").unwrap(),
-            vec![Token::Newline, Token::Newline]
+            tokenize("\n \t \n 1").unwrap(),
+            vec![Token::Newline, Token::Newline, Token::Integer(1)]
         );
     }
 
     #[test]
     fn test_keywords() {
         let keywords = [
-            ("TRUE", vec![Token::Boolean(true)]),
-            ("FALSE", vec![Token::Boolean(false)]),
-            ("var", vec![Token::Declare]),
-            ("assume", vec![Token::Assume]),
-            ("assert", vec![Token::Assert]),
-            ("if", vec![Token::If]),
-            ("then", vec![Token::Then]),
-            ("else", vec![Token::Else]),
-            ("while", vec![Token::While]),
-            ("invariant", vec![Token::Invariant]),
-            ("end", vec![Token::End]),
+            ("TRUE", Token::Boolean(true)),
+            ("FALSE", Token::Boolean(false)),
+            ("var", Token::Declare),
+            ("assume", Token::Assume),
+            ("assert", Token::Assert),
+            ("if", Token::If),
+            ("then", Token::Then),
+            ("else", Token::Else),
+            ("while", Token::While),
+            ("invariant", Token::Invariant),
+            ("end", Token::End),
         ];
 
-        for (kw, expected) in keywords {
-            assert_eq!(tokenize(kw).unwrap(), expected);
+        for (keyword, expected) in keywords {
+            assert_eq!(tokenize(keyword).unwrap(), vec![expected]);
         }
     }
 
@@ -225,7 +213,11 @@ mod tests {
     fn test_identifiers() {
         for ch in ('a'..='z').chain('A'..='Z') {
             let input = ch.to_string();
-            assert_eq!(tokenize(&input).unwrap(), vec![Token::Identifier(input)]);
+            assert_eq!(tokenize(&input).unwrap(), vec![Token::Identifier(&input)]);
+        }
+
+        for input in ["name_1", "X9", "variable_name"] {
+            assert_eq!(tokenize(input).unwrap(), vec![Token::Identifier(input)]);
         }
     }
 
@@ -239,27 +231,35 @@ mod tests {
     #[test]
     fn test_symbols() {
         let operators = [
-            ("+", vec![Token::Op(Symbol::Add)]),
-            ("-", vec![Token::Op(Symbol::Sub)]),
-            ("*", vec![Token::Op(Symbol::Mul)]),
-            ("/", vec![Token::Op(Symbol::Div)]),
-            ("<", vec![Token::Op(Symbol::Lt)]),
-            (">", vec![Token::Op(Symbol::Gt)]),
-            ("<=", vec![Token::Op(Symbol::Le)]),
-            (">=", vec![Token::Op(Symbol::Ge)]),
-            ("==", vec![Token::Op(Symbol::Eq)]),
-            ("!=", vec![Token::Op(Symbol::Neq)]),
-            ("&&", vec![Token::Op(Symbol::And)]),
-            ("||", vec![Token::Op(Symbol::Or)]),
-            (":=", vec![Token::Op(Symbol::Assign)]),
-            ("(", vec![Token::Op(Symbol::LParen)]),
-            (")", vec![Token::Op(Symbol::RParen)]),
-            (",", vec![Token::Comma]),
+            ("+", Symbol::Add),
+            ("-", Symbol::Sub),
+            ("*", Symbol::Mul),
+            ("/", Symbol::Div),
+            ("<", Symbol::Lt),
+            (">", Symbol::Gt),
+            ("<=", Symbol::Le),
+            (">=", Symbol::Ge),
+            ("==", Symbol::Eq),
+            ("!=", Symbol::Neq),
+            ("&&", Symbol::And),
+            ("||", Symbol::Or),
+            (":=", Symbol::Assign),
+            ("(", Symbol::LParen),
+            (")", Symbol::RParen),
         ];
 
-        for (op, expected) in operators {
-            assert_eq!(tokenize(op).unwrap(), expected);
+        for (operator, expected) in operators {
+            assert_eq!(tokenize(operator).unwrap(), vec![Token::Operator(expected)]);
         }
+
+        assert_eq!(tokenize(",").unwrap(), vec![Token::Comma]);
+    }
+
+    #[test]
+    fn test_missing_input() {
+        assert_eq!(tokenize(""), Err(LexError::MissingInput));
+        assert_eq!(tokenize(" \t"), Err(LexError::MissingInput));
+        assert_eq!(tokenize("\n\n"), Err(LexError::MissingInput));
     }
 
     #[test]
@@ -276,9 +276,28 @@ mod tests {
             .map(|c| c.to_string())
             .collect();
 
-        for inp in invalid_inputs {
-            assert_eq!(tokenize(&inp).unwrap_err(), LexError::InvalidToken(inp));
+        for input in invalid_inputs {
+            assert_eq!(
+                tokenize(&input).unwrap_err(),
+                LexError::InvalidToken(1, input)
+            );
         }
+    }
+
+    #[test]
+    fn test_invalid_integer() {
+        assert_eq!(
+            tokenize("9223372036854775808"),
+            Err(LexError::InvalidInt(1, "9223372036854775808".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_debug_line() {
+        assert_eq!(
+            tokenize("var x\n@"),
+            Err(LexError::InvalidToken(2, "@".to_string()))
+        );
     }
 
     #[test]
@@ -296,25 +315,25 @@ mod tests {
             vec![
                 Token::Newline,
                 Token::Declare,
-                Token::Identifier("x".into()),
+                Token::Identifier("x"),
                 Token::Comma,
-                Token::Identifier("y".into()),
+                Token::Identifier("y"),
                 Token::Newline,
-                Token::Identifier("x".into()),
-                Token::Op(Symbol::Assign),
+                Token::Identifier("x"),
+                Token::Operator(Symbol::Assign),
                 Token::Integer(42),
                 Token::Newline,
                 Token::If,
-                Token::Identifier("x".into()),
-                Token::Op(Symbol::Ge),
+                Token::Identifier("x"),
+                Token::Operator(Symbol::Ge),
                 Token::Integer(10),
-                Token::Op(Symbol::And),
+                Token::Operator(Symbol::And),
                 Token::Boolean(true),
                 Token::Then,
                 Token::Newline,
                 Token::Assert,
-                Token::Identifier("x".into()),
-                Token::Op(Symbol::Neq),
+                Token::Identifier("x"),
+                Token::Operator(Symbol::Neq),
                 Token::Integer(0),
                 Token::Newline,
                 Token::End,

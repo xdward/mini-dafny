@@ -9,17 +9,17 @@ use crate::{
 };
 
 /// Used to share the expresion parser's current state across functions.
-struct PrattParseContext<'a> {
+struct PrattParseContext<'tokens, 'src> {
     /// A peekable iterator over a slice of tokens.
-    iter: Peekable<Iter<'a, Token>>,
+    iter: Peekable<Iter<'tokens, Token<'src>>>,
     /// The index (1-based) of the current line being parsed.
-    line: u32,
+    line: usize,
 }
 
 /// Returns the precedence level of an operator.
-fn precedence(token: &Token, line: u32) -> Result<i64, ParseError> {
+fn precedence(token: &Token, line: usize) -> Result<i64, ParseError> {
     match token {
-        Token::Op(sym) => match sym {
+        Token::Operator(sym) => match sym {
             Symbol::Mul => Ok(5),
             Symbol::Div => Ok(5),
             Symbol::Add => Ok(4),
@@ -39,19 +39,19 @@ fn precedence(token: &Token, line: u32) -> Result<i64, ParseError> {
 }
 
 /// Parses an atomic value.
-fn parse_atom(ctx: &mut PrattParseContext) -> Result<Expr, ParseError> {
+fn parse_atom<'src>(ctx: &mut PrattParseContext<'_, 'src>) -> Result<Expr<'src>, ParseError> {
     match ctx.iter.next() {
-        Some(Token::Op(Symbol::LParen)) => {
+        Some(Token::Operator(Symbol::LParen)) => {
             let expr = pratt_parser(ctx, 0)?;
             // peel right parenthesis
             match ctx.iter.next() {
-                Some(Token::Op(Symbol::RParen)) => Ok(expr),
+                Some(Token::Operator(Symbol::RParen)) => Ok(expr),
                 _ => Err(ParseError::UnclosedParenthesis(ctx.line)),
             }
         }
         Some(Token::Integer(i)) => Ok(Expr::Integer(*i)),
         Some(Token::Boolean(b)) => Ok(Expr::Boolean(*b)),
-        Some(Token::Identifier(x)) => Ok(Expr::Variable(x.clone())),
+        Some(Token::Identifier(x)) => Ok(Expr::Variable(x)),
         _ => Err(ParseError::UnexpectedToken(ctx.line)),
     }
 }
@@ -63,11 +63,14 @@ fn parse_atom(ctx: &mut PrattParseContext) -> Result<Expr, ParseError> {
 /// such as *exponents* and *assignments*.
 ///
 /// See: <https://en.wikipedia.org/wiki/Operator_associativity>
-fn pratt_parser(ctx: &mut PrattParseContext, prev_prec: i64) -> Result<Expr, ParseError> {
+fn pratt_parser<'src>(
+    ctx: &mut PrattParseContext<'_, 'src>,
+    prev_prec: i64,
+) -> Result<Expr<'src>, ParseError> {
     let mut lhs = parse_atom(ctx)?;
 
     while let Some(tok) = ctx.iter.peek() {
-        if **tok == Token::Op(Symbol::RParen) {
+        if **tok == Token::Operator(Symbol::RParen) {
             break;
         }
 
@@ -85,7 +88,7 @@ fn pratt_parser(ctx: &mut PrattParseContext, prev_prec: i64) -> Result<Expr, Par
         lhs = Expr::BinOp {
             lhs: Box::new(lhs),
             op: match op {
-                Token::Op(sym) => sym.clone(),
+                Token::Operator(sym) => sym.clone(),
                 _ => return Err(ParseError::InvalidExpression(ctx.line)),
             },
             rhs: Box::new(rhs),
@@ -96,7 +99,7 @@ fn pratt_parser(ctx: &mut PrattParseContext, prev_prec: i64) -> Result<Expr, Par
 }
 
 /// Parses an expression from a slice of tokens.
-pub fn parse_expr(tokens: &[Token], line: u32) -> Result<Expr, ParseError> {
+pub fn parse_expr<'src>(tokens: &[Token<'src>], line: usize) -> Result<Expr<'src>, ParseError> {
     if tokens.is_empty() {
         return Err(ParseError::MissingExpression(line));
     }
@@ -138,7 +141,7 @@ mod tests {
         ];
         let mut prev_prec = 0;
         for sym in symbols {
-            let prec = precedence(&Token::Op(sym), 0).unwrap();
+            let prec = precedence(&Token::Operator(sym), 0).unwrap();
             assert!(prec >= prev_prec);
             prev_prec = prec;
         }
@@ -154,11 +157,11 @@ mod tests {
     fn test_expression_parsing() {
         let tokens = [
             Token::Integer(-10),
-            Token::Op(Symbol::Add),
+            Token::Operator(Symbol::Add),
             Token::Integer(4),
-            Token::Op(Symbol::Mul),
+            Token::Operator(Symbol::Mul),
             Token::Integer(3),
-            Token::Op(Symbol::Eq),
+            Token::Operator(Symbol::Eq),
             Token::Integer(2),
         ];
 
@@ -191,9 +194,9 @@ mod tests {
     #[test]
     fn test_err_invalid_expression() {
         let tokens = [
-            Token::Op(Symbol::Add),
-            Token::Identifier("x".to_string()),
-            Token::Op(Symbol::Add),
+            Token::Operator(Symbol::Add),
+            Token::Identifier("x"),
+            Token::Operator(Symbol::Add),
         ];
         assert_eq!(
             parse_expr(&tokens, 0).unwrap_err(),
@@ -204,12 +207,12 @@ mod tests {
     #[test]
     fn test_parenthesis() {
         let tokens = [
-            Token::Op(Symbol::LParen),
+            Token::Operator(Symbol::LParen),
             Token::Integer(1),
-            Token::Op(Symbol::Add),
+            Token::Operator(Symbol::Add),
             Token::Integer(2),
-            Token::Op(Symbol::RParen),
-            Token::Op(Symbol::Add),
+            Token::Operator(Symbol::RParen),
+            Token::Operator(Symbol::Add),
             Token::Integer(3),
         ];
         assert_eq!(
@@ -229,7 +232,7 @@ mod tests {
     #[test]
     fn test_unclosed_parenthesis() {
         assert_eq!(
-            parse_expr(&[Token::Op(Symbol::LParen), Token::Integer(1)], 0).unwrap_err(),
+            parse_expr(&[Token::Operator(Symbol::LParen), Token::Integer(1)], 0).unwrap_err(),
             ParseError::UnclosedParenthesis(0)
         );
     }
@@ -237,7 +240,7 @@ mod tests {
     #[test]
     fn test_trailing_parenthesis() {
         assert_eq!(
-            parse_expr(&[Token::Integer(1), Token::Op(Symbol::RParen)], 0).unwrap_err(),
+            parse_expr(&[Token::Integer(1), Token::Operator(Symbol::RParen)], 0).unwrap_err(),
             ParseError::TrailingParenthesis(0)
         );
     }
